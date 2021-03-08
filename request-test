@@ -1,0 +1,74 @@
+#!/bin/bash 
+#==============================================================================
+#title          :request-test.sh
+#description    :This script makes a request to an url and counts the number of elements
+#author         :Telmo Martinho
+#date           :20210304
+#version        :0.1.0    
+#usage          :bash request-test.sh
+#notes          :Install curl, jq to use this script.
+#==============================================================================
+
+
+num_of_tags=4
+api_url="https://localhost:8000/api/stuff"
+
+
+# Echo if opt -v is present
+function log () {
+    if [[ $verbose -eq 1 ]]; then
+        echo "$@"
+    fi
+}
+
+# Test if curl is installed
+which_cmd=$(which curl ; echo $?)
+cmd_exists=($which_cmd)
+if [[ "${cmd_exists[1]}" != "0" ]]; then
+    echo "error: curl not installed"
+    exit 1
+fi
+
+# Test if jq is installed
+which_cmd=$(which jq ; echo $?)
+cmd_exists=($which_cmd)
+if [[ "${cmd_exists[1]}" != "0" ]]; then
+    echo "error: jq not installed"
+    exit 1
+fi
+
+# Get options, token and verbose
+while getopts t:v flag
+do
+    case "${flag}" in
+        (t) token=${OPTARG};;
+        (v) verbose=0 ; verbose=1 ;;
+        (*) exit 1 ;;
+    esac
+done
+
+# If token exists continue
+if [[ -z "$token" ]]; then
+
+	echo "Missing -t <token>"
+
+else
+
+    log "Fetching..."
+    
+    result=$(curl -s -H "authorization: Bearer ${token}" ${api_url} | jq -r '.data[] | .name')
+    names_array=($result)
+
+    for project_name in "${names_array[@]}"
+    do
+        log "Fetching Project \"${project_name}\""
+        tags=$(curl -s -H "authorization: Bearer ${token}" ${api_url}/${project_name} | jq -r '.data.tags | keys[]')
+        tags_array=($tags)
+        if ((${#tags_array[@]} != ${num_of_tags})); then
+            echo "error: project with invalid number of tags: \"${project_name}\""
+        else
+            log "OK"
+        fi
+    done
+
+fi
